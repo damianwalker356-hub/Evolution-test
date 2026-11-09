@@ -1,0 +1,24 @@
+name: Browser PhysX smoke test
+on:
+  push:
+    branches: [browser-simulator]
+    paths: ['browser/**', '.github/workflows/browser-physics-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-physx-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: browser
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm test
