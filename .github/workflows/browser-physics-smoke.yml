@@ -1,13 +1,12 @@
-name: Browser PhysX smoke test
+name: Creature physics and source-scope checks
 on:
   push:
     branches: [browser-simulator]
-    paths: ['browser/**', '.github/workflows/browser-physics-smoke.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  actual-physx-wasm:
+  creature-physics-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     defaults:
@@ -17,8 +16,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Verify audit behavior
+        run: python3 audit_creature_scope_test.py
+      - name: Audit tracked source and baseline boundary
+        run: python3 audit_creature_scope.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: npm install --ignore-scripts --no-audit --no-fund
-      - run: npm test
+      - name: Check creature control rules and PhysX startup
+        run: npm test
