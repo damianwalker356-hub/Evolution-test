@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node core.test.mjs && node physx-smoke.test.mjs"
+    "test": "node core.test.mjs && node physx-startup.test.mjs"
   },
   "dependencies": {
     "physx-js-webidl": "2.9.1"
