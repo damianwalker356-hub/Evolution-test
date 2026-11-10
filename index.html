@@ -1,10 +1,95 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Evolution — creature editor preview</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><title>Evolution</title>
 <style>
-:root{color-scheme:dark;font:16px "Times New Roman",Times,serif;background:#111925;color:#ecf3ff}*{box-sizing:border-box}body{margin:0;padding:12px;max-width:1400px;margin-inline:auto}h1{font-size:1.4rem}p{line-height:1.5}.notice{padding:12px;background:#362c14;border:1px solid #d0ac50;border-radius:8px}button,input{font:inherit;padding:10px;min-height:44px;color:inherit;background:#22334a;border:1px solid #697d98;border-radius:6px}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}button[aria-pressed=true]{outline:2px solid #8bdcff;background:#245d81}nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}main{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px}canvas{display:block;width:100%;height:58vh;min-height:300px;border:1px solid #6c8099;border-radius:8px;touch-action:none;background:#122033}aside{background:#19283c;padding:12px;border-radius:8px}label{display:block;margin:10px 0}label input{display:block;width:100%}label input[type=checkbox]{display:inline;width:24px;height:24px;min-height:24px;vertical-align:middle}small{line-height:1.5}#message{min-height:3em}input[type=file]{max-width:100%}:focus-visible{outline:3px solid #a0e7ff}@media(max-width:720px){main{grid-template-columns:1fr}canvas{height:46vh}body{padding:8px}}
-</style></head><body><h1>Evolution creature workbench</h1><p class="notice">Repository test build: editor only. Creature physics and training are not connected. This is not a completed simulator; no animated or fake learning fallback is provided.</p>
-<label>Creature name<input id="name" maxlength="128"></label>
-<nav aria-label="Editor tools"><button data-tool="select" aria-pressed="true">Select / move</button><button data-tool="joint" aria-pressed="false">Add joint</button><button data-tool="bone" aria-pressed="false">Connect bone</button><button data-tool="muscle" aria-pressed="false">Connect muscle</button><button data-tool="pan" aria-pressed="false">Pan</button></nav>
-<nav aria-label="Design actions"><button id="undo">Undo</button><button id="redo">Redo</button><button id="delete">Delete selected</button><button id="fit">Fit view</button><button id="zoomIn">Zoom in</button><button id="zoomOut">Zoom out</button><button id="new">New</button><button id="example">Load example</button></nav>
-<main><section><canvas id="view" aria-label="Creature design canvas"></canvas><p id="message" role="status" aria-live="polite"></p><small>Bone: tap two joints. Muscle: tap two bone centers. Select/move: tap a component or drag a joint. Pan: drag the canvas. Imported decorations are retained but not drawn. The drawing is a design preview, not a physics result.</small></section><aside><h2>Properties</h2><div id="properties"></div><p id="stats"></p><h2>Design files</h2><label>Import JSON<input id="import" type="file" accept=".json,application/json"></label><button id="export">Export JSON</button><button id="save">Save locally</button><button id="restore">Restore local save</button><h2>Simulation</h2><button disabled>Run — not implemented</button><button disabled>Train — not implemented</button><p>Design JSON only; binary simulation saves are not supported. No hosting setup is required beyond the existing branch/root Pages source.</p></aside></main>
+:root{--u:.4px;--ink:#333;--teal:#134357;font:16px "Times New Roman",Times,serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#eee;color:var(--ink);font-family:"Times New Roman",Times,serif;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block;background:#eee}
+.ui{position:fixed;inset:0;pointer-events:none}
+.ui>*{pointer-events:auto}
+.p{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u))}
+.pr{position:absolute;right:calc(var(--r)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u))}
+.pc{position:absolute;left:calc(50% + var(--cx)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u))}
+.pb{position:absolute;right:calc(var(--r)*var(--u));bottom:calc(var(--b)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u))}
+.btn{display:flex;align-items:center;justify-content:center;flex-direction:column;font:700 calc(38*var(--u))/1 "Times New Roman",Times,serif;text-transform:uppercase;color:var(--ink);background:linear-gradient(#f7f7f7,#ececec);border:calc(2*var(--u)) solid #b5b5b5;border-radius:calc(7*var(--u));box-shadow:0 calc(2*var(--u)) calc(3*var(--u)) rgba(0,0,0,.18);padding:0;margin:0;cursor:pointer;touch-action:manipulation}
+.btn:active{background:#ddd}
+.btn[aria-pressed=true]{transform:translateX(calc(21*var(--u)));border-color:#888}
+.btn.teal{color:var(--teal)}
+.btn.off{color:#9a9a9a;background:#dedede;border-color:#c8c8c8;box-shadow:none;cursor:default}
+.btn.evolve{background:#1a4252;color:#fff;border-color:#102e3a;font-size:calc(40*var(--u))}
+.btn.evolve svg{width:calc(70*var(--u));height:calc(56*var(--u));margin-bottom:calc(6*var(--u))}
+.btn.gallery .grid{display:grid;grid-template-columns:repeat(5,calc(20*var(--u)));gap:calc(6*var(--u));margin-bottom:calc(10*var(--u))}
+.btn.gallery .grid i{height:calc(14*var(--u));border:calc(2.5*var(--u)) solid var(--teal);border-radius:calc(4*var(--u))}
+.btn.gallery{font-size:calc(40*var(--u));color:var(--teal)}
+.small{font-size:calc(30*var(--u))}
+.namebox{background:linear-gradient(#f7f7f7,#ececec);border:calc(2*var(--u)) solid #b5b5b5;border-radius:calc(7*var(--u));display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 calc(2*var(--u)) calc(3*var(--u)) rgba(0,0,0,.18)}
+.namebox input{width:92%;border:0;background:transparent;text-align:center;font:700 calc(36*var(--u))/1.1 "Times New Roman",Times,serif;color:var(--teal);text-transform:uppercase;text-overflow:ellipsis;outline:0;padding:0;-webkit-user-select:text;user-select:text}
+.namebox small{font:700 calc(15*var(--u)) "Times New Roman",serif;color:#9bb0b8;letter-spacing:.05em}
+.lbl{position:absolute;right:calc(var(--r)*var(--u));top:calc(var(--y)*var(--u));height:calc(var(--h)*var(--u));display:flex;align-items:center;font:700 calc(30*var(--u)) "Times New Roman",serif;text-transform:uppercase;white-space:nowrap}
+.field{background:#fff;border:calc(2*var(--u)) solid #9a9a9a;border-radius:calc(7*var(--u));text-align:center;font:700 calc(40*var(--u)) "Times New Roman",serif;color:var(--ink);padding:0;width:100%;height:100%;-webkit-user-select:text;user-select:text}
+.drop{align-items:center;justify-content:flex-end;padding-right:calc(34*var(--u));position:relative;flex-direction:row}
+.drop:before{content:"\2304";position:absolute;left:calc(14*var(--u));top:calc(-2*var(--u));color:#999;font-size:calc(40*var(--u))}
+.sq{font-size:calc(56*var(--u))}
+#properties{position:absolute;right:calc(124*var(--u));top:calc(360*var(--u));width:calc(320*var(--u));max-height:calc(220*var(--u));overflow:auto;background:#fff;border:calc(2*var(--u)) solid #b5b5b5;border-radius:calc(7*var(--u));padding:calc(10*var(--u));font:700 calc(24*var(--u)) "Times New Roman",serif}
+#properties:empty{display:none}
+#properties p{margin:0 0 calc(6*var(--u));text-transform:uppercase}
+#properties label{display:flex;justify-content:space-between;align-items:center;gap:calc(10*var(--u));margin:calc(4*var(--u)) 0}
+#properties input{width:calc(130*var(--u));min-height:calc(34*var(--u));font:inherit;border:1px solid #999;border-radius:4px;padding:2px 4px;-webkit-user-select:text;user-select:text}
+#properties input[type=checkbox]{width:calc(30*var(--u));height:calc(30*var(--u))}
+#message{position:absolute;left:calc(1000*var(--u));transform:translateX(-50%);top:calc(120*var(--u));width:calc(900*var(--u));text-align:center;font:700 calc(26*var(--u)) "Times New Roman",serif;color:#666;pointer-events:none;min-height:calc(34*var(--u))}
+#rotate{display:none;position:fixed;inset:0;z-index:99;background:#eee;align-items:center;justify-content:center;text-align:center;font:700 24px "Times New Roman",serif;padding:30px}
+@media(orientation:portrait){#rotate{display:flex}}
+dialog{border:0;padding:0;width:100vw;height:100vh;max-width:none;max-height:none;background:rgba(18,18,18,.94);color:#fff;font-family:"Times New Roman",Times,serif}
+dialog::backdrop{background:rgba(0,0,0,.85)}
+.dlg{position:absolute;inset:0}
+.dlg h2{position:absolute;left:calc(163*var(--u));top:calc(18*var(--u));margin:0;font:700 calc(46*var(--u)) "Times New Roman",serif;text-transform:uppercase}
+.dlg .close{position:absolute;left:calc(163*var(--u));bottom:calc(20*var(--u));font:700 calc(46*var(--u)) "Times New Roman",serif;color:#fff;background:none;border:0;text-transform:uppercase;cursor:pointer}
+.tabs{position:absolute;left:calc(385*var(--u));top:calc(92*var(--u));width:calc(1230*var(--u));display:flex;gap:calc(10*var(--u))}
+.tabs button{flex:1;height:calc(62*var(--u));background:#3a3a3a;color:#ddd;border:0;border-radius:calc(6*var(--u)) calc(6*var(--u)) 0 0;font:700 calc(32*var(--u)) "Times New Roman",serif;text-transform:uppercase;cursor:pointer}
+.tabs button[aria-selected=true]{background:#f2f2f2;color:#222}
+.pane{position:absolute;left:calc(385*var(--u));top:calc(154*var(--u));width:calc(1230*var(--u));height:calc(660*var(--u));background:#222;padding:calc(24*var(--u));overflow:auto;font:700 calc(28*var(--u))/1.35 "Times New Roman",serif}
+.pane[hidden]{display:none}
+.pane .row{display:flex;flex-wrap:wrap;gap:calc(14*var(--u));margin-bottom:calc(20*var(--u))}
+.pane .row .btn{width:auto;min-width:calc(190*var(--u));height:calc(70*var(--u));padding:0 calc(20*var(--u));font-size:calc(28*var(--u));flex-direction:row}
+.pane h3{margin:calc(10*var(--u)) 0;font-size:calc(30*var(--u));text-transform:uppercase;color:#f0a0a0}
+</style></head><body>
+<canvas id="view" aria-label="Creature editor canvas"></canvas>
+<div class="ui">
+<button class="btn teal p" style="--x:123;--y:-6;--w:232;--h:90;font-size:calc(27*var(--u))" data-stub="Simulations">Simulations</button>
+<button class="btn pc" style="--cx:-243;--y:-6;--w:113;--h:90;font-size:calc(28*var(--u))" id="save">Save</button>
+<div class="namebox pc" style="--cx:-125;--y:-6;--w:250;--h:90"><input id="name" maxlength="128" aria-label="Creature name" autocomplete="off"><small>CREATURE</small></div>
+<button class="btn pc" style="--cx:130;--y:-6;--w:113;--h:90;font-size:calc(26*var(--u))" id="new">Clear</button>
+<span class="lbl" style="--r:238;--y:23;--h:44">Population</span>
+<div class="pr" style="--r:124;--y:23;--w:93;--h:44"><input class="field" value="50" inputmode="numeric" aria-label="Population" data-stub="Population"></div>
+<span class="lbl" style="--r:238;--y:98;--h:44">Seconds per generation</span>
+<div class="pr" style="--r:124;--y:98;--w:93;--h:44"><input class="field" value="30" inputmode="numeric" aria-label="Seconds per generation" data-stub="Seconds per generation"></div>
+<button class="btn drop pr" style="--r:124;--y:174;--w:285;--h:66;font-size:calc(32*var(--u))" data-stub="The task selector">Running</button>
+<button class="btn sq pr" style="--r:215;--y:271;--w:66;--h:66" id="help" aria-label="Help">?</button>
+<button class="btn sq pr" style="--r:124;--y:271;--w:66;--h:66" id="gear" aria-label="Settings">&#9881;</button>
+<div id="properties" role="group" aria-label="Selected component"></div>
+<nav aria-label="Editor tools">
+<button class="btn p" style="--x:123;--y:180;--w:201;--h:88" data-tool="joint" aria-pressed="false">Joint</button>
+<button class="btn p" style="--x:123;--y:280;--w:201;--h:88" data-tool="bone" aria-pressed="false">Bone</button>
+<button class="btn p" style="--x:123;--y:378;--w:201;--h:88" data-tool="muscle" aria-pressed="false">Muscle</button>
+<button class="btn p" style="--x:123;--y:477;--w:201;--h:88" data-tool="move" aria-pressed="false">Move</button>
+<button class="btn p" style="--x:123;--y:577;--w:201;--h:88" data-tool="delete" aria-pressed="false">Delete</button>
+<button class="btn p" style="--x:123;--y:679;--w:201;--h:88" data-tool="select" aria-pressed="true">Select</button>
+</nav>
+<button class="btn p small" style="--x:123;--y:828;--w:134;--h:74;font-size:calc(26*var(--u))" data-stub="Skin">Skin</button>
+<button class="btn sq pc" style="--cx:-87;--y:828;--w:75;--h:74" id="undo" aria-label="Undo">&#8630;</button>
+<button class="btn sq pc" style="--cx:12;--y:828;--w:74;--h:74" id="redo" aria-label="Redo">&#8631;</button>
+<button class="btn gallery pb" style="--r:124;--b:318;--w:192;--h:138" data-stub="Gallery"><span class="grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>Gallery</button>
+<button class="btn evolve pb" style="--r:124;--b:23;--w:192;--h:138" data-stub="Evolve"><svg viewBox="0 0 70 56" fill="#fff" stroke="#1a4252" stroke-width="2" aria-hidden="true"><path d="M10 30C4 22 12 8 26 10 32 2 46 4 48 12 62 10 68 26 58 32 60 44 46 52 36 46 28 54 12 48 10 30Z"/><path d="M35 12V46M20 24c6 0 8 6 15 6M50 24c-6 0-8 6-15 6" fill="none"/></svg>Evolve</button>
+<div id="message" role="status" aria-live="polite"></div>
+</div>
+<dialog id="settings"><div class="dlg">
+<h2>Settings</h2>
+<div class="tabs" role="tablist"><button role="tab" data-tab="editor" aria-selected="true">Editor</button><button role="tab" data-tab="simulation" aria-selected="false">Simulation</button><button role="tab" data-tab="neural" aria-selected="false">Neural Network</button><button role="tab" data-tab="general" aria-selected="false">General</button></div>
+<section class="pane" data-pane="editor"><h3>Design files</h3><div class="row"><label class="btn">Import JSON<input id="import" type="file" accept=".json,application/json" hidden></label><button class="btn" id="export">Export JSON</button><button class="btn" id="restore">Restore local save</button><button class="btn" id="example">Load example</button></div><h3>View</h3><div class="row"><button class="btn" id="fit">Fit view</button><button class="btn" id="zoomIn">Zoom in</button><button class="btn" id="zoomOut">Zoom out</button></div></section>
+<section class="pane" data-pane="simulation" hidden><h3>Simulation</h3><p>Not implemented. Creature physics is not connected in this build.</p></section>
+<section class="pane" data-pane="neural" hidden><h3>Neural network</h3><p>Not implemented. The layer editor is not connected in this build.</p></section>
+<section class="pane" data-pane="general" hidden><h3>Current design</h3><p id="stats"></p><p>Design JSON only; binary simulation saves are not supported.</p></section>
+<button class="close" id="closeSettings">Close</button></div></dialog>
+<dialog id="helpDialog"><div class="dlg"><h2>Help</h2><section class="pane" style="top:calc(110*var(--u));height:calc(700*var(--u))"><p>Joint: tap empty space to place a joint.</p><p>Bone: tap two joints.</p><p>Muscle: tap two bone centres.</p><p>Move / Select: tap a part, drag a joint to move it, or drag empty space to pan. Pinch-free zoom is in Settings.</p><p>Delete: tap a part to remove it, together with anything attached to it.</p><p>This build is an editor only. Evolve, Gallery, Skin and Simulations are not implemented.</p></section><button class="close" id="closeHelp">Close</button></div></dialog>
+<div id="rotate">Rotate your device to landscape to use the creature editor.</div>
 <script type="module" src="./browser/editor.mjs"></script></body></html>
