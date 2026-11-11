@@ -6,14 +6,11 @@ export async function openPhysX(factory) {
   const owned = [], bodies = [];
   let foundation, physics, scene, dispatcher, material, closed = false;
   const keep = value => { owned.push(value); return value; };
+  const release = obj => { if (obj && typeof obj.release === 'function') obj.release(); };
   function close() {
     if (closed) return; closed = true;
-    for (let i=bodies.length-1;i>=0;i--) bodies[i].release();
-    if (scene) scene.release();
-    if (material) material.release();
-    if (dispatcher) dispatcher.release();
-    if (physics) physics.release();
-    if (foundation) foundation.release();
+    for (let i=bodies.length-1;i>=0;i--) release(bodies[i]);
+    release(scene); release(material); release(dispatcher); release(physics); release(foundation);
     for (let i=owned.length-1;i>=0;i--) P.destroy(owned[i]);
   }
   try {
