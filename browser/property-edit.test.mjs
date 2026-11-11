@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {fromInput,toDisplay,fieldLabel,isPercentField} from './property-edit.mjs';
+let n=0;const test=(s,f)=>{f();n++;console.log('PASS '+s);};
+test('9 percent stored as 0.09',()=>assert.equal(fromInput('penalty','9'),0.09));
+test('0 and 100 accepted',()=>{assert.equal(fromInput('penalty','0'),0);assert.equal(fromInput('penalty','100'),1);});
+test('over 100 rejected',()=>assert.throws(()=>fromInput('penalty','101')));
+test('negative rejected',()=>assert.throws(()=>fromInput('penalty','-1')));
+test('blank rejected, not coerced to 0',()=>assert.throws(()=>fromInput('penalty','  ')));
+test('non-number rejected',()=>assert.throws(()=>fromInput('weight','abc')));
+test('weight passes through',()=>assert.equal(fromInput('weight','2.5'),2.5));
+test('display roundtrip',()=>{for(const p of [0,1,9,33.3,100])assert.equal(toDisplay('penalty',fromInput('penalty',String(p))),p);});
+test('labels',()=>{assert.equal(fieldLabel('penalty'),'penalty (%)');assert.equal(fieldLabel('weight'),'weight');assert.ok(isPercentField('penalty'));});
+console.log(n+' property tests passed');

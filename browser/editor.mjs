@@ -1,4 +1,5 @@
 import {validateDesign,parseDesign,emptyDesign,nextID,removeComponent,exampleDesign} from './design.mjs';
+import {fromInput,toDisplay,fieldLabel,isPercentField} from './property-edit.mjs';
 const $=id=>document.getElementById(id),canvas=$('view'),ctx=canvas.getContext('2d');
 const clone=x=>JSON.parse(JSON.stringify(x));
 let design=exampleDesign(),tool='select',selected=null,pending=null,drag=null,history=[],future=[],camera={x:0,y:2,scale:50};
@@ -18,7 +19,7 @@ function refresh(){
  const panel=$('properties');panel.replaceChildren();const v=current();if(!v){draw();return;}
  const title=document.createElement('p');title.textContent=`${selected.kind} #${v.id}`;panel.append(title);
  const fields=selected.kind==='joints'?['weight','penalty']:selected.kind==='bones'?['weight','wing','inverted','legacy']:['strength','canExpand','userID'];
- for(const k of fields){const label=document.createElement('label'),input=document.createElement('input');label.append(document.createTextNode(k));input.setAttribute('aria-label',k);input.type=typeof v[k]==='boolean'?'checkbox':typeof v[k]==='number'?'number':'text';if(input.type==='checkbox')input.checked=v[k];else input.value=v[k];if(input.type==='number')input.step=k==='strength'?'1':'any';input.onchange=()=>{try{const d=clone(design);d[selected.kind].find(x=>x.id===selected.id)[k]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;commit(d);say('Property updated.');}catch(e){say(e.message);refresh();}};label.append(input);panel.append(label);}draw();
+ for(const k of fields){const label=document.createElement('label'),input=document.createElement('input');label.append(document.createTextNode(fieldLabel(k)));input.setAttribute('aria-label',fieldLabel(k));input.type=typeof v[k]==='boolean'?'checkbox':typeof v[k]==='number'?'number':'text';if(input.type==='checkbox')input.checked=v[k];else input.value=input.type==='number'?toDisplay(k,v[k]):v[k];if(input.type==='number'){input.step=k==='strength'?'1':'any';input.inputMode='decimal';if(isPercentField(k)){input.min='0';input.max='100';}}input.onchange=()=>{try{const d=clone(design);d[selected.kind].find(x=>x.id===selected.id)[k]=input.type==='checkbox'?input.checked:input.type==='number'?fromInput(k,input.value):input.value;commit(d);say(`${fieldLabel(k)} saved: ${input.type==='checkbox'?input.checked:input.value}.`);}catch(e){say(`${fieldLabel(k)} not saved: ${e.message}`);refresh();}};label.append(input);panel.append(label);}draw();
 }
 function draw(){
  const ratio=Math.min(2,window.devicePixelRatio||1),w=canvas.clientWidth,h=canvas.clientHeight;if(canvas.width!==Math.round(w*ratio)||canvas.height!==Math.round(h*ratio)){canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);}ctx.setTransform(ratio,0,0,ratio,0,0);ctx.fillStyle='#eeeeee';ctx.fillRect(0,0,w,h);

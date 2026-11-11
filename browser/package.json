@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node core.test.mjs && node genetics.test.mjs && node controller.test.mjs && node design.test.mjs && node creature-physics.test.mjs && node physx-startup.test.mjs"
+    "test": "node core.test.mjs && node genetics.test.mjs && node controller.test.mjs && node design.test.mjs && node property-edit.test.mjs && node creature-physics.test.mjs && node physx-startup.test.mjs"
   },
   "dependencies": {
     "physx-js-webidl": "2.9.1"
