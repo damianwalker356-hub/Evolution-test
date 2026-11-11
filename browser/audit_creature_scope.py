@@ -7,6 +7,8 @@ from pathlib import Path
 
 BASE = '093102e3a1fbed01edc317cb9848d5b8f11d836f'
 PATTERNS = [r'engine[ _-]*forge', r'forge-agent-session-state', r'livengood', r'douaud', r'chen[ _-]*flynn']
+# Root Pages entry files are the deliberate deployment surface for this simulator.
+ROOT_PAGES_FILES = {'.nojekyll', 'index.html'}
 
 def audit(root, enforce_boundary=True):
     root = Path(root).resolve()
@@ -41,7 +43,7 @@ def audit(root, enforce_boundary=True):
             report['findings'].append({'path': name, 'line': 0})
     if enforce_boundary:
         changed = [x.decode('utf-8') for x in git('diff', '--name-only', '-z', BASE, '--').split(b'\0') if x]
-        report['outsideBrowserChanges'] = [n for n in changed if not n.startswith('browser/') and n != '.github/workflows/browser-physics-smoke.yml']
+        report['outsideBrowserChanges'] = [n for n in changed if not n.startswith('browser/') and n != '.github/workflows/browser-physics-smoke.yml' and n not in ROOT_PAGES_FILES]
     report['passed'] = not (report['findings'] or report['outsideBrowserChanges'] or report['symlinksNotRead'])
     return report
 
