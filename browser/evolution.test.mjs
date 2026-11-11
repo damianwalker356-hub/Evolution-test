@@ -4,6 +4,8 @@
 import assert from 'node:assert/strict';
 import { loadPhysXFactory } from './physx-load.mjs';
 import { CreatureTrainer } from './evolution.mjs';
+import { createSharedPhysics, createCreatureWorld, evaluateGenome } from './creature-world.mjs';
+import { CreatureNetwork } from './controller.mjs';
 import { exampleDesign } from './design.mjs';
 
 const factory = await loadPhysXFactory();
@@ -103,6 +105,36 @@ await test('the best chromosome re-evaluates to the same fitness on the real eng
       `replayed ${replay.unclampedFitness} vs generation best ${report.best.stats.unclampedFitness}`);
     assert.ok(Math.abs(replay.horizontalDistance - report.best.stats.horizontalDistance) < 1e-4);
   } finally { trainer.close(); }
+});
+
+await test('batched worlds on one shared foundation match solo evaluation exactly', async () => {
+  const design = exampleDesign();
+  const shared = await createSharedPhysics(factory);
+  try {
+    const worldA = await createCreatureWorld(factory, design, { seconds: 1, physics: shared });
+    const worldB = await createCreatureWorld(factory, design, { seconds: 1, physics: shared });
+    const alone = await createCreatureWorld(factory, design, { seconds: 1, physics: shared });
+    try {
+      const layers = worldA.layers;
+      const rng = (await import('./genetics.mjs')).createRandom;
+      const genomeA = new CreatureNetwork(layers, undefined, rng(101)).weights;
+      const genomeB = new CreatureNetwork(layers, undefined, rng(202)).weights;
+      // Run both worlds simultaneously, each with its own genome.
+      worldA.reset(genomeA); worldB.reset(genomeB);
+      let liveA = true, liveB = true;
+      while (liveA || liveB) {
+        if (liveA) liveA = worldA.step();
+        if (liveB) liveB = worldB.step();
+      }
+      const batchedA = worldA.statistics(), batchedB = worldB.statistics();
+      // Now run genome A entirely alone: batching must not change physics.
+      const soloStats = await evaluateGenome(alone, genomeA);
+      assert.ok(Math.abs(soloStats.unclampedFitness - batchedA.unclampedFitness) < 1e-4,
+        `solo ${soloStats.unclampedFitness} vs batched ${batchedA.unclampedFitness}`);
+      assert.ok(Math.abs(soloStats.horizontalDistance - batchedA.horizontalDistance) < 1e-4);
+      assert.notDeepEqual([...genomeA], [...genomeB]);
+    } finally { worldA.close(); worldB.close(); alone.close(); }
+  } finally { shared.close(); }
 });
 
 console.log(`${count} evolution tests passed; real PhysX execution, Unity parity unverified`);

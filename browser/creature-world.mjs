@@ -45,6 +45,32 @@ function localToWorld(body, local) {
   return out;
 }
 
+// One PhysX foundation per process is the supported setup. Multiple scenes on
+// a shared physics instance are the Unity model: every creature of a batch
+// simulates in its own scene, so creatures never collide with each other.
+export async function createSharedPhysics(factory) {
+  const P = await factory();
+  const owned = [];
+  const keep = (value) => { owned.push(value); return value; };
+  const allocator = keep(new P.PxDefaultAllocator());
+  const errors = keep(new P.PxDefaultErrorCallback());
+  const foundation = P.CreateFoundation(P.PHYSICS_VERSION, allocator, errors);
+  if (!foundation) throw new Error('PhysX foundation creation failed');
+  const scale = keep(new P.PxTolerancesScale());
+  const physics = P.CreatePhysics(P.PHYSICS_VERSION, foundation, scale);
+  if (!physics) throw new Error('PhysX creation failed');
+  let closed = false;
+  return {
+    P, physics,
+    close() {
+      if (closed) return; closed = true;
+      const release = obj => { if (obj && typeof obj.release === 'function') obj.release(); };
+      release(physics); release(foundation);
+      for (let i = owned.length - 1; i >= 0; i--) try { P.destroy(owned[i]); } catch (e) {}
+    },
+  };
+}
+
 export async function createCreatureWorld(factory, design, options = {}) {
   if (!design || !Array.isArray(design.joints) || design.joints.length === 0) {
     throw new TypeError('A design with at least one joint is required');
@@ -59,12 +85,13 @@ export async function createCreatureWorld(factory, design, options = {}) {
   if (!(Number.isFinite(seconds) && seconds > 0 && seconds <= 120)) throw new RangeError('Invalid episode length');
   const maxSteps = Math.round(seconds / FIXED_DT);
 
-  const P = await factory();
+  const shared = options.physics; // optional shared context (one foundation)
+  const P = shared ? shared.P : await factory();
   const owned = [];
   const keep = (value) => { owned.push(value); return value; };
   const jointsD6 = [], distanceJoints = [], fixedJoints = [];
   let closed = false;
-  let foundation, physics, scene, dispatcher, groundMaterial;
+  let foundation = null, physics, scene, dispatcher, groundMaterial;
 
   function close() {
     if (closed) return; closed = true;
@@ -74,19 +101,25 @@ export async function createCreatureWorld(factory, design, options = {}) {
     if (scene) try { scene.release(); } catch (e) {}
     if (groundMaterial) try { groundMaterial.release(); } catch (e) {}
     if (dispatcher) try { dispatcher.release(); } catch (e) {}
-    if (physics) try { physics.release(); } catch (e) {}
-    if (foundation) try { foundation.release(); } catch (e) {}
+    if (!shared) {
+      if (physics) try { physics.release(); } catch (e) {}
+      if (foundation) try { foundation.release(); } catch (e) {}
+    }
     for (let i = owned.length - 1; i >= 0; i--) try { P.destroy(owned[i]); } catch (e) {}
   }
 
   try {
-    const allocator = keep(new P.PxDefaultAllocator());
-    const errors = keep(new P.PxDefaultErrorCallback());
-    foundation = P.CreateFoundation(P.PHYSICS_VERSION, allocator, errors);
-    if (!foundation) throw new Error('PhysX foundation creation failed');
     const scale = keep(new P.PxTolerancesScale());
-    physics = P.CreatePhysics(P.PHYSICS_VERSION, foundation, scale);
-    if (!physics) throw new Error('PhysX creation failed');
+    if (shared) {
+      physics = shared.physics;
+    } else {
+      const allocator = keep(new P.PxDefaultAllocator());
+      const errors = keep(new P.PxDefaultErrorCallback());
+      foundation = P.CreateFoundation(P.PHYSICS_VERSION, allocator, errors);
+      if (!foundation) throw new Error('PhysX foundation creation failed');
+      physics = P.CreatePhysics(P.PHYSICS_VERSION, foundation, scale);
+      if (!physics) throw new Error('PhysX creation failed');
+    }
     const desc = keep(new P.PxSceneDesc(scale));
     const gravity = keep(new P.PxVec3(0, -50, 0));
     dispatcher = P.DefaultCpuDispatcherCreate(0); // deterministic single-threaded stepping
